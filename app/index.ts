@@ -38,7 +38,7 @@ conn.on('auth', function () {
     for (const user of usersOnlineRegex) {
       let name: string = user.match(/"(?:[^\\"]|\\\\|\\")*"/i)?.[0] ?? "";
       let steamId = user.match(/STEAM_[A-Za-z0-9]+:[A-Za-z0-9]+:[A-Za-z0-9]+/igm)?.[0] ?? ""
-      let map = str.match(/map\s+:\s+de_[A-Za-z0-9]+/igm)?.[0] ?? ""
+      let map = str.match(/map\s+:\s+[A-Za-z0-9/\]de_[A-Za-z0-9]+/igm)?.[0] ?? ""
       if (users.get(steamId.toString()) == undefined) {
         users.set(steamId.toString(), name)
       }
