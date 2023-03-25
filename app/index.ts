@@ -5,7 +5,7 @@
 import { PrismaClient, PlayersAntiCheating } from '@prisma/client';
 import Rcon from 'ts-rcon';
 import { interval } from 'rxjs'
-import  SteamId  from 'steamid'
+import SteamId from 'steamid'
 import * as dotenv from 'dotenv' // see https://github.com/motdotla/dotenv#how-do-i-use-dotenv-with-import
 dotenv.config();
 const prisma = new PrismaClient()
@@ -23,43 +23,59 @@ conn.on('auth', function () {
   console.log("Authenticated");
   console.log("Sending command: help")
   conn.send("status");
-}).on('response', function (str) {
-  // console.log("Response: " + str);
+}).on('response', function (str:string) {
 
+  if(str.includes('sem o anticheat aberto')){
+    return;
+  }
   console.log(str)
-  let listOfUser = useRegex(str)
+  let usersOnlineRegex = useRegex(str)
   let listSteamIdOnline: string[] = [];
   let listUsersWIthSteamIdOnline: any[] = [];
 
   //conectado
-  if (listOfUser) {
-    for (const user of listOfUser) {
-      let name = user.split(' ')[0];
-      let steamId = user.split(' ')[1];
+  if (usersOnlineRegex) {
+    for (const user of usersOnlineRegex) {
+      let name: string = user.match(/"(?:[^\\"]|\\\\|\\")*"/i)?.[0] ?? "";
+      let steamId = user.match(/STEAM_[A-Za-z0-9]+:[A-Za-z0-9]+:[A-Za-z0-9]+/igm)?.[0] ?? ""
+      let map = str.match(/map\s+:\s+de_[A-Za-z0-9]+/igm)?.[0] ?? ""
       if (users.get(steamId.toString()) == undefined) {
-
         users.set(steamId.toString(), name)
-
-        var ss = new SteamId(steamId);
-        prisma.playersAntiCheating.findFirst({
-          where: {
-            SteamId: ss.getSteamID64()
-          }
-        }).then(async (userDb) => {
-          if (userDb) {
-            userDb.IsConnected = true;
-            userDb.Name = name;
+      }
+      var ss = new SteamId(steamId);
+      prisma.playersAntiCheating.findFirst({
+        where: {
+          SteamId: ss.getSteamID64()
+        }
+      }).then(async (userDb) => {
+        if (userDb) {
+          userDb.IsConnected = true;
+          userDb.Name = name.replace('"', '').replace('"', ''),
+            userDb.Map = map.split(':')[1].replace(' ', ''),
             await prisma.playersAntiCheating.update({
               data: userDb,
               where: {
                 SteamId: userDb.SteamId
               }
             });
+        } else {
+          let player : PlayersAntiCheating = {
+            Name: name.replace('"', '').replace('"', ''),
+            Map: map.split(':')[1].replace(' ', ''),
+            Expiration: new Date(Date.now()),
+            IsAntiCheatOpen: true,
+            IsConnected: true,
+            LastPhotoTaken: new Date(Date.now()),
+            SteamId: ss.getSteamID64().toString()
           }
-        });
-      }
+          await prisma.playersAntiCheating.create ({
+            data: player
+          });
+        }
+      });
+
       listSteamIdOnline.push(steamId);
-      listUsersWIthSteamIdOnline.push({name, steamId});
+      listUsersWIthSteamIdOnline.push({ name, steamId });
     }
 
   }
@@ -68,7 +84,7 @@ conn.on('auth', function () {
   for (const user of users) {
     let userOnline = listSteamIdOnline.find(x => x == user[0])
     var ss = new SteamId(user[0]);
-    
+
     if (userOnline == undefined) {
       prisma.playersAntiCheating.findFirst({
         where: {
@@ -76,6 +92,7 @@ conn.on('auth', function () {
         }
       }).then(async (userDb) => {
         if (userDb) {
+          users.delete(ss.getSteamID64());
           userDb.IsConnected = false;
           await prisma.playersAntiCheating.update({
             data: userDb,
@@ -85,10 +102,9 @@ conn.on('auth', function () {
           });
         }
       });
-
-
     }
   }
+
 
   prisma.playersAntiCheating.findMany({
     where: {
@@ -99,17 +115,29 @@ conn.on('auth', function () {
       let dateTimeNow = new Date(0);
       dateTimeNow.setMilliseconds(Date.now());
 
-      let user = listUsersWIthSteamIdOnline.find(x => x.steamId == userDb.SteamId);
+      // let user = listUsersWIthSteamIdOnline.find(x => new SteamId(x.steamId).getSteamID64() == userDb.SteamId);
+      let tt = dateTimeNow;
 
-      if ((dateTimeNow.getSeconds() > userDb.Expiration.getSeconds()) || userDb.IsAntiCheatOpen == false) {
-        conn.send(`kick ${user.name}`)
-        conn.send(`say Jogador ${user.Name} kickado, sem o anticheat aberto.`)
+      var expirationMiliSeconds = Date.UTC(userDb.Expiration.getUTCFullYear(), userDb.Expiration.getUTCMonth(),
+        userDb.Expiration.getUTCDate(), userDb.Expiration.getUTCHours(),
+        userDb.Expiration.getUTCMinutes(), userDb.Expiration.getUTCSeconds());
+
+      let expirationDate = addHours(new Date(expirationMiliSeconds), 3);
+
+      if ((dateTimeNow > expirationDate) || userDb.IsAntiCheatOpen == false) {
+        userDb.IsAntiCheatOpen = false;
+        userDb.IsConnected = false;
+        await prisma.playersAntiCheating.update({
+          data: userDb,
+          where: {
+            SteamId: userDb.SteamId
+          }
+        });
+        // conn.send(`kick ${userDb.Name}`)
+        conn.send(`say Jogador ${userDb.Name} kickado, sem o anticheat aberto.`)
       }
     }
   })
-  console.log(listOfUser)
-
-
 }).on('error', function (err) {
   conn.connect();
   console.log("Error: " + err);
@@ -121,12 +149,20 @@ conn.on('auth', function () {
 conn.connect();
 
 
-interval(5000).subscribe((x) => {
+interval(20000).subscribe((x) => {
   conn.send("status");
+  console.log("De novo");
 })
 
 
-function useRegex(input) {
+function useRegex(input): string[] {
   let reg = /(".+") (STEAM_[A-Za-z0-9]+:[A-Za-z0-9]:[A-Za-z0-9]+)/g;
   return input.match(reg);
+}
+
+
+function addHours(date, hours) {
+  date.setHours(date.getHours() + hours);
+
+  return date;
 }

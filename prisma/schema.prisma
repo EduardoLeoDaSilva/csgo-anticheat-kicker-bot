@@ -12,7 +12,7 @@ datasource db {
 
 
 model PlayersAntiCheating {
-  SteamId  String @id 
+  SteamId  String @id @map("SteamId")
   Name String @map("Name")
   IsConnected  Boolean @map("IsConnected")
   Map  String @map("Map")
