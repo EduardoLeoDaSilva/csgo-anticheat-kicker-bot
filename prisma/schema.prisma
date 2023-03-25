@@ -7,16 +7,16 @@ generator client {
 
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
+  url      = "mysql://dudi:rabopodi@11@get5.mysql.uhserver.com:3306/get5"
 }
 
 
 model PlayersAntiCheating {
   SteamId  String @id 
-  Name String @map("UserId")
-  IsConnected  Boolean @map("Email")
-  Map  String @map("Robot")
-  LastPhotoTaken  DateTime @map("RobotId")
-  IsAntiCheatOpen  Boolean @map("RobotIdName")
-  Expiration  DateTime @map("StopWin")
+  Name String @map("Name")
+  IsConnected  Boolean @map("IsConnected")
+  Map  String @map("Map")
+  LastPhotoTaken  DateTime @map("LastPhotoTaken")
+  IsAntiCheatOpen  Boolean @map("IsAntiCheatOpen")
+  Expiration  DateTime @map("Expiration")
 }
