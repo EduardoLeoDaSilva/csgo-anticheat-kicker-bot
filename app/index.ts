@@ -63,7 +63,7 @@ conn.on('auth', function () {
           let player : PlayersAntiCheating = {
             Name: name.replace('"', '').replace('"', ''),
             Map: map.split(':')[1].replace(' ', ''),
-            Expiration: new Date(Date.now()),
+            Expiration: addHours(date, -3),
             IsAntiCheatOpen: true,
             IsConnected: true,
             LastPhotoTaken: addHours(date, -3),
