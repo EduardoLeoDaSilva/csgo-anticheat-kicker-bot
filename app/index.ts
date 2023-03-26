@@ -59,13 +59,14 @@ conn.on('auth', function () {
               }
             });
         } else {
+          let date = new Date(Date.now());
           let player : PlayersAntiCheating = {
             Name: name.replace('"', '').replace('"', ''),
             Map: map.split(':')[1].replace(' ', ''),
             Expiration: new Date(Date.now()),
             IsAntiCheatOpen: true,
             IsConnected: true,
-            LastPhotoTaken: new Date(Date.now()),
+            LastPhotoTaken: addHours(date, -3),
             SteamId: ss.getSteamID64().toString()
           }
           await prisma.playersAntiCheating.create ({
